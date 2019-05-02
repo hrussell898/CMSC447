@@ -1,0 +1,68 @@
+<Window x:Class="ConwayGameOfLife.MainWindow"  
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"  
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"  
+  Title="Conway's Game of Life" 
+  Height="{Binding WindowHeight, Mode=TwoWay}"
+  Width="{Binding WindowWidth, Mode=TwoWay}"
+  Background="Black"
+  Closing="MainWindow_Closing">
+    <Window.Resources>
+        <SolidColorBrush x:Key="ButtonBrush" Color="DodgerBlue"/>
+        <Style TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="{StaticResource ButtonBrush}" />
+            <Setter Property="Width" Value="80" />
+            <Setter Property="Margin" Value="10" />
+        </Style>
+        <Style TargetType="{x:Type Slider}">
+            <!--<Setter Property="Background"  Value="{StaticResource ButtonBrush}" /> -->
+        </Style>
+    </Window.Resources>
+
+    <!-- Background Container -->
+    <Grid x:Name="MainGrid" Background="White" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" >
+        <StackPanel x:Name="MainStack" Orientation="Vertical" Margin="0,20,0,0">
+            <!-- Listbox -->
+            <ListBox x:Name="MainList" 
+                     VerticalAlignment="Top" 
+                     Height="400" Width="Auto" 
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" 
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                     MouseUp="MainList_Click">
+                   
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="{x:Type ListBoxItem}">
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="BorderBrush" Value="Lavender" />
+                        <Setter Property="Height" Value="10" />
+                        <Setter Property="Width" Value="10" />                        
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Width="Auto" Height="Auto"  HorizontalAlignment="Left">
+                            <Image Margin="0" Source="{Binding Path}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <StackPanel x:Name="BtnStackPanel" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="121,0,121,1" Height="42">
+                <Button x:Name="StepBtn" Content="Step" Click="StepBtn_Click"/>
+                <StackPanel Width="100" RenderTransformOrigin="0.746,1.284">
+                    <Label x:Name="SliderValue" FontSize="10" Content="10"  Height="12" Margin="38,0" HorizontalAlignment="Center" Width="24"/>
+                    <Slider x:Name="SpeedSlider"
+                        Minimum="500"
+                        Maximum="10000"
+                        Height="20"
+                        ValueChanged="SpeedSlider_Changed" RenderTransformOrigin="0.405,3.624"
+                        />
+                </StackPanel>
+                <Button x:Name="RunBtn" Content="Run" Click="RunBtn_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>
