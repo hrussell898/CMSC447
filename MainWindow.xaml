@@ -4,7 +4,8 @@
   Title="Conway's Game of Life" 
   Height="{Binding WindowHeight, Mode=TwoWay}"
   Width="{Binding WindowWidth, Mode=TwoWay}"
-  Background="Black">
+  Background="Black"
+  Closing="MainWindow_Closing">
     <Window.Resources>
         <SolidColorBrush x:Key="ButtonBrush" Color="DodgerBlue"/>
         <Style TargetType="{x:Type Button}">
@@ -43,7 +44,9 @@
                 </ListBox.ItemsPanel>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Width="Auto" Height="Auto"  HorizontalAlignment="Left"/>
+                        <StackPanel Width="Auto" Height="Auto"  HorizontalAlignment="Left">
+                            <Image Margin="0" Source="{Binding Path}"/>
+                        </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
@@ -52,7 +55,7 @@
                 <StackPanel Width="100" RenderTransformOrigin="0.746,1.284">
                     <Label x:Name="SliderValue" FontSize="10" Content="10"  Height="12" Margin="38,0" HorizontalAlignment="Center" Width="24"/>
                     <Slider x:Name="SpeedSlider"
-                        Minimum="1"
+                        Minimum="500"
                         Maximum="10000"
                         Height="20"
                         ValueChanged="SpeedSlider_Changed" RenderTransformOrigin="0.405,3.624"
