@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -22,18 +24,18 @@ namespace ConwayGameOfLife
         public const int BoardHeight = 40;
         public const int BoardWidth = 80;
         public const int TileSize = 10;
+
+        public const byte Dead = 0;
+        public const byte Alive = 1;
+        public const byte Virus = 2;
+
+        public const string AliveImage = "Resources/Bacteria.jpg";
+        public const string VirusImage = "Resources/Virus.jpg";
     }
 
     /// Interaction logic for MainWindow.xaml
     public partial class MainWindow : Window
     {
-        private enum State
-        {
-            Dead = 0,
-            Alive = 1,
-            Virus = 2
-        }
-
         struct Point
         {
             int x;
@@ -51,9 +53,19 @@ namespace ConwayGameOfLife
         //
         // Data Members
         //
-        private List<List<State> > m_board = new List<List<State>>();
+        private List<List<byte> > m_board = new List<List<byte>>();
         private int m_boardRows = Constants.BoardHeight;
         private int m_boardCols = Constants.BoardWidth;
+
+        private bool m_running = true;
+        private bool m_step = false;
+
+
+        private System.Timers.Timer m_timer = new System.Timers.Timer();
+        private int m_speed = 1000; // In milliseconds.
+        
+
+        private Thread boardThread;
 
 
         public MainWindow()
@@ -67,38 +79,72 @@ namespace ConwayGameOfLife
             this.SizeToContent = SizeToContent.WidthAndHeight;
 
             // Initialize the board data structure.
-            BoardInit( Constants.BoardHeight, Constants.BoardWidth );
-
-
-            //MainList.Height = Constants.BoardHeight * Constants.TileSize;
-            //MainList.MaxWidth = Constants.BoardWidth * Constants.TileSize;
+            BoardInit( m_board, Constants.BoardHeight, Constants.BoardWidth );
             
-            MainGrid.Width = Constants.BoardWidth * Constants.TileSize;
-            
+            // Resize main list for board width/height.
+            MainList.Height = Constants.BoardHeight * Constants.TileSize + 4;
+            MainList.MaxWidth = Constants.BoardWidth * Constants.TileSize + 4;
+           
+            // Fill board.
             int numberOfTiles = Constants.BoardHeight * Constants.BoardWidth;
             for (int i = 0; i < numberOfTiles; ++i)
             {
                 ListBoxItem tile = new ListBoxItem();
                 MainList.Items.Insert(0, tile);
             }
+            
+            // Timer for when the auto-run is selected.
+            m_timer.Elapsed += RunEvent;
+            m_timer.Enabled = false;
+            m_timer.AutoReset = true;
+            m_timer.Interval = m_speed;
+            SpeedSlider.Value = m_speed;
+
+            // Start our worker thread.
+            boardThread = new Thread(Run);
+            boardThread.SetApartmentState(ApartmentState.STA);
+            boardThread.Start();
+        }
+
+        private void RunEvent(Object source, System.Timers.ElapsedEventArgs e)
+        {
+            Step();
+        }
+
+        void MainWindow_Closing(object sender, CancelEventArgs e)
+        {
+            m_running = false;
+            boardThread.Abort();
         }
 
         // Step button on-click handler.
         private void StepBtn_Click(object sender, RoutedEventArgs e)
         {
-            Step();
+            m_step = true;
         }
 
         // Speed slider handler.
         private void SpeedSlider_Changed(object sender, RoutedEventArgs e)
         {
-            // TODO - Set timer.
+            m_timer.Interval = SpeedSlider.Value;
         }
 
         // Run button on-click handler.
         private void RunBtn_Click(object sender, RoutedEventArgs e)
         {
-            // TODO - for(timer){ Step() }
+            m_timer.Enabled = !m_timer.Enabled;
+        }
+
+        private void Run()
+        {
+            while (m_running)
+            {
+                if( m_step )
+                {
+                    Step();
+                    m_step = false;
+                }
+            }       
         }
 
         // Run button on-click handler.
@@ -108,29 +154,34 @@ namespace ConwayGameOfLife
             int index = MainList.SelectedIndex;
             ListBoxItem newItem = new ListBoxItem();
             Point myPoint = getPoint(index);
-            if (m_board[myPoint.X][myPoint.Y] == State.Alive)
+            if (m_board[myPoint.X][myPoint.Y] == Constants.Alive)
             {
                 newItem.Background = Brushes.White;
-                m_board[myPoint.X][myPoint.Y] = State.Dead;
+                m_board[myPoint.X][myPoint.Y] = Constants.Dead;
             }
             else
             {
                 newItem.Background = Brushes.Black;
-                m_board[myPoint.X][myPoint.Y] = State.Alive;
+                m_board[myPoint.X][myPoint.Y] = Constants.Alive;
             }
             MainList.Items[index] = newItem;
         }
 
         // Will populate the board with dead tiles with the given dimensions.
-        private void BoardInit(int rows, int cols)
+        private void BoardInit( List<List<byte>> board, int rows, int cols)
         {
-            this.m_board.Capacity = rows;
+            if (board == null)
+            {
+                throw new ArgumentNullException(nameof(board));
+            }
+
+            board.Capacity = rows;
             for(int row = 0 ; row < rows; ++row )
             {
-                this.m_board.Add( new List<State>(cols) );
+                board.Add( new List<byte>(cols) );
                 for( int col = 0; col < cols; ++col )
                 {
-                    this.m_board[row].Add(State.Dead);
+                    board[row].Add(Constants.Dead);
                 }
             }
         }
@@ -138,6 +189,9 @@ namespace ConwayGameOfLife
         // This will "step" the board one time tick into the future.
         private void Step()
         {
+            List<List<byte>> newBoard = new List<List<byte>>();
+            BoardInit(newBoard, m_boardRows, m_boardCols);
+
             int numNeighbors = 0;
             for (int i = 0; i < m_board.Capacity; ++i)
             {
@@ -146,35 +200,35 @@ namespace ConwayGameOfLife
                     numNeighbors = 0;
                     
                     // Check for living neighbors.
-                    if( i != 0 && j != 0 && m_board[i - 1][j - 1] == State.Alive   )
+                    if( i != 0 && j != 0 && m_board[i - 1][j - 1] == Constants.Alive   )
                     {
                         numNeighbors++;
                     }
-                    if( i != 0  && m_board[i - 1][j] == State.Alive )
+                    if( i != 0  && m_board[i - 1][j] == Constants.Alive )
                     {
                         numNeighbors++;
                     }
-                    if( i != 0 && j != m_board[0].Count - 1 && m_board[i - 1][j + 1] == State.Alive )
+                    if( i != 0 && j != m_board[0].Count - 1 && m_board[i - 1][j + 1] == Constants.Alive )
                     {
                         numNeighbors++;
                     }
-                    if( j != 0 && m_board[i][j - 1] == State.Alive )
+                    if( j != 0 && m_board[i][j - 1] == Constants.Alive )
                     {
                         numNeighbors++;
                     }
-                    if( j != m_board[0].Count - 1 && m_board[i][j + 1] == State.Alive )
+                    if( j != m_board[0].Count - 1 && m_board[i][j + 1] == Constants.Alive )
                     {
                         numNeighbors++;
                     }
-                    if( i != m_board.Count - 1 && j != 0 && m_board[i + 1][j - 1] == State.Alive )
+                    if( i != m_board.Count - 1 && j != 0 && m_board[i + 1][j - 1] == Constants.Alive )
                     {
                         numNeighbors++;
                     }
-                    if( i != m_board.Count - 1 && j != 0 && m_board[i + 1][j] == State.Alive )
+                    if( i != m_board.Count - 1 && j != 0 && m_board[i + 1][j] == Constants.Alive )
                     {
                         numNeighbors++;
                     }
-                    if( i != m_board.Count - 1 && j != m_board[0].Count - 1 && m_board[i + 1][j + 1] == State.Alive )
+                    if( i != m_board.Count - 1 && j != m_board[0].Count - 1 && m_board[i + 1][j + 1] == Constants.Alive )
                     {
                         numNeighbors++;
                     }
@@ -185,14 +239,15 @@ namespace ConwayGameOfLife
                         // Current tile will die or stay dead.
                         case 0:
                         case 1:
-                            m_board[i][j] = State.Dead;
+                            newBoard[i][j] = Constants.Dead;
                             break;
                         // Nothing happens with two alive neighbors.
                         case 2:
+                            newBoard[i][j] = m_board[i][j];
                             break;
                         // Current tile is "born"
                         case 3:
-                            m_board[i][j] = State.Alive;
+                            newBoard[i][j] = Constants.Alive;
                             break;
                         // Death by overcrowding.
                         case 4:
@@ -200,7 +255,7 @@ namespace ConwayGameOfLife
                         case 6:
                         case 7:
                         case 8:
-                            m_board[i][j] = State.Dead;
+                            newBoard[i][j] = Constants.Dead;
                             break;
                         default:
                             break;
@@ -209,7 +264,8 @@ namespace ConwayGameOfLife
             } // End rows
 
             // Update the board. 
-            DrawBoard();
+            m_board = newBoard;
+            Application.Current.Dispatcher.Invoke(DrawBoard);
         }
 
         private void DrawBoard()
@@ -221,24 +277,26 @@ namespace ConwayGameOfLife
                 for (int col = 0; col < m_boardCols; ++col)
                 {
                     ListBoxItem newItem = new ListBoxItem();
-                    if( m_board[row][col] == State.Dead )
+                    if( m_board[row][col] == Constants.Virus )
                     {
+                        newItem.Background = Brushes.Green;
                         MainList.Items[index] = newItem;
                     } 
-                    else if( m_board[row][col] == State.Alive )
+                    else if( m_board[row][col] == Constants.Alive )
                     {
                         newItem.Background = Brushes.Black;
                         MainList.Items[index] = newItem;
                     }
                     else
                     {
-                        newItem.Background = Brushes.Green;
                         MainList.Items[index] = newItem;
                     }
                     ++index;
                 }
             }
         }
+
+
 
         // Get list box index from m_board location.
         private int GetIndex( int row, int col )
