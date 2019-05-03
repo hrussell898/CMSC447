@@ -6,6 +6,7 @@
   Width="{Binding WindowWidth, Mode=TwoWay}"
   Background="Black"
   Closing="MainWindow_Closing">
+
     <Window.Resources>
         <SolidColorBrush x:Key="ButtonBrush" Color="DodgerBlue"/>
         <Style TargetType="{x:Type Button}">
@@ -21,20 +22,27 @@
     <!-- Background Container -->
     <Grid x:Name="MainGrid" Background="White" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" >
         <StackPanel x:Name="MainStack" Orientation="Vertical" Margin="0,20,0,0">
+            <ToolBarTray Background="DarkGray" Height="30" VerticalAlignment="Top">
+                <ToolBar Name="MyToolbar" Height="30" Margin="0,0,76,0" >
+                    <Button Background="DodgerBlue" Content="Load" Click="Load_Clicked"/>
+                    <Button Background="DodgerBlue" Content="Save" Click="Save_Clicked"/>
+                </ToolBar>
+            </ToolBarTray>
             <!-- Listbox -->
             <ListBox x:Name="MainList" 
                      VerticalAlignment="Top" 
                      Height="400" Width="Auto" 
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" 
                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                     MouseUp="MainList_Click">
-                   
+                     MouseLeftButtonUp="MainList_LeftClick"
+                     MouseRightButtonUp="MainList_RightClick">
+
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="{x:Type ListBoxItem}">
                         <Setter Property="BorderThickness" Value="1" />
                         <Setter Property="BorderBrush" Value="Lavender" />
                         <Setter Property="Height" Value="10" />
-                        <Setter Property="Width" Value="10" />                        
+                        <Setter Property="Width" Value="10" />
                     </Style>
                 </ListBox.ItemContainerStyle>
                 <ListBox.ItemsPanel>
@@ -52,16 +60,15 @@
             </ListBox>
             <StackPanel x:Name="BtnStackPanel" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="121,0,121,1" Height="42">
                 <Button x:Name="StepBtn" Content="Step" Click="StepBtn_Click"/>
-                <StackPanel Width="100" RenderTransformOrigin="0.746,1.284">
-                    <Label x:Name="SliderValue" FontSize="10" Content="10"  Height="12" Margin="38,0" HorizontalAlignment="Center" Width="24"/>
-                    <Slider x:Name="SpeedSlider"
+                
+                <Button x:Name="RunBtn" Content="Run" Click="RunBtn_Click"/>
+                <Slider x:Name="SpeedSlider"
                         Minimum="500"
                         Maximum="10000"
                         Height="20"
-                        ValueChanged="SpeedSlider_Changed" RenderTransformOrigin="0.405,3.624"
-                        />
-                </StackPanel>
-                <Button x:Name="RunBtn" Content="Run" Click="RunBtn_Click"/>
+                        Width="100"
+                        ValueChanged="SpeedSlider_Changed" RenderTransformOrigin="0.405,3.624"/>
+                <Label x:Name="SliderVal" Content="1000 ms" VerticalAlignment="Center"/>
             </StackPanel>
         </StackPanel>
     </Grid>
