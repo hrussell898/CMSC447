@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -14,6 +15,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+
+using Microsoft.Win32;
+
 
 
 
@@ -36,6 +40,7 @@ namespace ConwayGameOfLife
     /// Interaction logic for MainWindow.xaml
     public partial class MainWindow : Window
     {
+        // Used to convert from ListBox index to m_board indexes and back.
         struct Point
         {
             int x;
@@ -60,9 +65,9 @@ namespace ConwayGameOfLife
         private bool m_running = true;
         private bool m_step = false;
 
-
         private System.Timers.Timer m_timer = new System.Timers.Timer();
         private int m_speed = 1000; // In milliseconds.
+        
         
 
         private Thread boardThread;
@@ -98,7 +103,9 @@ namespace ConwayGameOfLife
             m_timer.Enabled = false;
             m_timer.AutoReset = true;
             m_timer.Interval = m_speed;
+
             SpeedSlider.Value = m_speed;
+            
 
             // Start our worker thread.
             boardThread = new Thread(Run);
@@ -106,11 +113,13 @@ namespace ConwayGameOfLife
             boardThread.Start();
         }
 
+        // Handler for the m_timer event.
         private void RunEvent(Object source, System.Timers.ElapsedEventArgs e)
         {
             Step();
         }
 
+        // Terminated thread when closing application.
         void MainWindow_Closing(object sender, CancelEventArgs e)
         {
             m_running = false;
@@ -127,6 +136,11 @@ namespace ConwayGameOfLife
         private void SpeedSlider_Changed(object sender, RoutedEventArgs e)
         {
             m_timer.Interval = SpeedSlider.Value;
+            if (SliderVal == null)
+            {
+                SliderVal = new Label();
+            }
+            SliderVal.Content = String.Format( "{0:F0} ms", SpeedSlider.Value );
         }
 
         // Run button on-click handler.
@@ -147,11 +161,13 @@ namespace ConwayGameOfLife
             }       
         }
 
-        // Run button on-click handler.
-        private void MainList_Click(object sender, MouseEventArgs e)
+        // Left-click handler.
+        private void MainList_LeftClick(object sender, MouseEventArgs e)
         {
             
             int index = MainList.SelectedIndex;
+            if (index < 0)
+                return;
             ListBoxItem newItem = new ListBoxItem();
             Point myPoint = getPoint(index);
             if (m_board[myPoint.X][myPoint.Y] == Constants.Alive)
@@ -163,6 +179,26 @@ namespace ConwayGameOfLife
             {
                 newItem.Background = Brushes.Black;
                 m_board[myPoint.X][myPoint.Y] = Constants.Alive;
+            }
+            MainList.Items[index] = newItem;
+        }
+
+        // Right-click handler.
+        private void MainList_RightClick(object sender, MouseEventArgs e)
+        {
+
+            int index = MainList.SelectedIndex;
+            ListBoxItem newItem = new ListBoxItem();
+            Point myPoint = getPoint(index);
+            if (m_board[myPoint.X][myPoint.Y] == Constants.Virus)
+            {
+                newItem.Background = Brushes.White;
+                m_board[myPoint.X][myPoint.Y] = Constants.Dead;
+            }
+            else
+            {
+                newItem.Background = Brushes.Green;
+                m_board[myPoint.X][myPoint.Y] = Constants.Virus;
             }
             MainList.Items[index] = newItem;
         }
@@ -193,6 +229,12 @@ namespace ConwayGameOfLife
             BoardInit(newBoard, m_boardRows, m_boardCols);
 
             int numNeighbors = 0;
+            int numVirus = 0;
+
+            // Will keep track of living neighbors for viruses to take.
+            List<Tuple<int, int>> neighbors= new List<Tuple<int, int>>();
+            Random rand = new Random(); // Randomizer for virus victim choosing.
+
             for (int i = 0; i < m_board.Capacity; ++i)
             {
                 for (int j = 0; j < m_board[0].Capacity; ++j)
@@ -200,66 +242,159 @@ namespace ConwayGameOfLife
                     numNeighbors = 0;
                     
                     // Check for living neighbors.
-                    if( i != 0 && j != 0 && m_board[i - 1][j - 1] == Constants.Alive   )
+                    if (i != 0 && j != 0)
                     {
-                        numNeighbors++;
-                    }
-                    if( i != 0  && m_board[i - 1][j] == Constants.Alive )
-                    {
-                        numNeighbors++;
-                    }
-                    if( i != 0 && j != m_board[0].Count - 1 && m_board[i - 1][j + 1] == Constants.Alive )
-                    {
-                        numNeighbors++;
-                    }
-                    if( j != 0 && m_board[i][j - 1] == Constants.Alive )
-                    {
-                        numNeighbors++;
-                    }
-                    if( j != m_board[0].Count - 1 && m_board[i][j + 1] == Constants.Alive )
-                    {
-                        numNeighbors++;
-                    }
-                    if( i != m_board.Count - 1 && j != 0 && m_board[i + 1][j - 1] == Constants.Alive )
-                    {
-                        numNeighbors++;
-                    }
-                    if( i != m_board.Count - 1 && j != 0 && m_board[i + 1][j] == Constants.Alive )
-                    {
-                        numNeighbors++;
-                    }
-                    if( i != m_board.Count - 1 && j != m_board[0].Count - 1 && m_board[i + 1][j + 1] == Constants.Alive )
-                    {
-                        numNeighbors++;
+                        if (m_board[i - 1][j - 1] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i - 1, j - 1));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i - 1][j - 1] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
+
                     }
 
-                    // Update this tile.
-                    switch(numNeighbors)
+                    if (i != 0)
                     {
-                        // Current tile will die or stay dead.
-                        case 0:
-                        case 1:
-                            newBoard[i][j] = Constants.Dead;
-                            break;
-                        // Nothing happens with two alive neighbors.
-                        case 2:
-                            newBoard[i][j] = m_board[i][j];
-                            break;
-                        // Current tile is "born"
-                        case 3:
-                            newBoard[i][j] = Constants.Alive;
-                            break;
-                        // Death by overcrowding.
-                        case 4:
-                        case 5:
-                        case 6:
-                        case 7:
-                        case 8:
-                            newBoard[i][j] = Constants.Dead;
-                            break;
-                        default:
-                            break;
+                        if (m_board[i - 1][j] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i - 1, j));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i - 1][j] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
                     }
+
+                    if (i != 0 && j != m_board[0].Count - 1)
+                    {
+                        if (m_board[i - 1][j + 1] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i - 1, j + 1));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i - 1][j + 1] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
+                    }
+
+                    if (j != 0)
+                    {
+                        if (m_board[i][j - 1] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i, j - 1));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i][j - 1] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
+                    }
+
+                    if (j != m_board[0].Count - 1)
+                    {
+                        if (m_board[i][j + 1] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i, j + 1));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i][j + 1] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
+                    }
+
+                    if (i != m_board.Count - 1 && j != 0)
+                    {
+                        if (m_board[i + 1][j - 1] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i + 1, j - 1));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i + 1][j - 1] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
+                    }
+
+
+                    if (i != m_board.Count - 1 && j != 0)
+                    {
+                        if (m_board[i + 1][j] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i + 1, j));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i + 1][j] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
+                    }
+
+                    if (i != m_board.Count - 1 && j != m_board[0].Count - 1)
+                    {
+                        if (m_board[i + 1][j + 1] == Constants.Alive)
+                        {
+                            neighbors.Add(new Tuple<int, int>(i + 1, j + 1));
+                            numNeighbors++;
+                        }
+                        else if (m_board[i + 1][j + 1] == Constants.Virus)
+                        {
+                            numVirus++;
+                        }
+                    }
+
+                    // If the current cell is not a virus we will use regular rules.
+                    if (m_board[i][j] != Constants.Virus && newBoard[i][j] != Constants.Virus)
+                    {
+                        // Update this tile.
+                        switch (numNeighbors)
+                        {
+                            // Current tile will die or stay dead.
+                            case 0:
+                            case 1:
+                                newBoard[i][j] = Constants.Dead;
+                                break;
+                            // Nothing happens with two alive neighbors.
+                            case 2:
+                                newBoard[i][j] = m_board[i][j];
+                                break;
+                            // Current tile is "born"
+                            case 3:
+                                newBoard[i][j] = Constants.Alive;
+                                break;
+                            // Death by overcrowding.
+                            case 4:
+                            case 5:
+                            case 6:
+                            case 7:
+                            case 8:
+                                newBoard[i][j] = Constants.Dead;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    else if(m_board[i][j] == Constants.Virus)
+                    { 
+                        // In the case of a virus we need to grab a victim if there is one or else die.
+                        if( numNeighbors > 0)
+                        {
+                            // Grab a random victim.
+                            Tuple<int, int> victim = neighbors[rand.Next(0, neighbors.Count)];
+                            newBoard[victim.Item1][victim.Item2] = Constants.Virus;
+                            newBoard[i][j] = Constants.Virus; // In the new board the current virus will also live on.
+                        }
+                        else
+                        {
+                            newBoard[i][j] = Constants.Dead;
+                        }
+                    }
+                    neighbors.Clear();
                 } // End cols
             } // End rows
 
@@ -268,6 +403,7 @@ namespace ConwayGameOfLife
             Application.Current.Dispatcher.Invoke(DrawBoard);
         }
 
+        // Redraws board.
         private void DrawBoard()
         {
             // Update listboxes based on m_board.
@@ -296,8 +432,6 @@ namespace ConwayGameOfLife
             }
         }
 
-
-
         // Get list box index from m_board location.
         private int GetIndex( int row, int col )
         {
@@ -313,6 +447,51 @@ namespace ConwayGameOfLife
             Point retVal = new Point(x, y);
             
             return retVal;
+        }
+
+        // File functions.
+        private void Save_Clicked(object sender, RoutedEventArgs e)
+        {
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                Console.WriteLine(saveFileDialog.FileName);
+                using (BinaryWriter writer = new BinaryWriter(File.Open(saveFileDialog.FileName, FileMode.Create)))
+                {
+                    writer.Write(m_boardRows);
+                    writer.Write(m_boardCols);
+                    for(int i = 0; i < m_boardRows; ++i)
+                    {
+                        for(int j = 0; j < m_boardCols; ++j)
+                        {
+                            writer.Write(m_board[i][j]);
+                        }
+                    }
+                }
+            }
+        }
+
+        private void Load_Clicked(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            if (openFileDialog.ShowDialog() == true)
+            {
+                using (BinaryReader reader = new BinaryReader(File.Open(openFileDialog.FileName, FileMode.Open)))
+                {
+                    m_boardRows = reader.ReadInt32();
+                    m_boardCols = reader.ReadInt32();
+                    m_board = new List<List<byte>>();
+                    BoardInit(m_board, m_boardRows, m_boardCols);
+                    for (int i = 0; i < m_boardRows; ++i)
+                    {
+                        for (int j = 0; j < m_boardCols; ++j)
+                        {
+                            m_board[i][j] = reader.ReadByte();
+                        }
+                    }
+                }
+                DrawBoard();
+            }
         }
     } // Class
 } // Namespace
