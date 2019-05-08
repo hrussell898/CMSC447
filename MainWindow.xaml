@@ -8,27 +8,28 @@
   Closing="MainWindow_Closing">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="ButtonBrush" Color="DodgerBlue"/>
+        <SolidColorBrush x:Key="ButtonBrush" Color="DodgerBlue" />
         <Style TargetType="{x:Type Button}">
             <Setter Property="Background" Value="{StaticResource ButtonBrush}" />
+            <Setter Property="Foreground" Value="White" />
             <Setter Property="Width" Value="80" />
             <Setter Property="Margin" Value="10" />
         </Style>
-        <Style TargetType="{x:Type Slider}">
-            <!--<Setter Property="Background"  Value="{StaticResource ButtonBrush}" /> -->
-        </Style>
+
     </Window.Resources>
 
     <!-- Background Container -->
     <Grid x:Name="MainGrid" Background="White" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" >
         <StackPanel x:Name="MainStack" Orientation="Vertical" Margin="0,20,0,0">
+            <!-- Control panel along the top of the window. -->
             <ToolBarTray Background="DarkGray" Height="30" VerticalAlignment="Top">
                 <ToolBar Name="MyToolbar" Height="30" Margin="0,0,76,0" >
-                    <Button Background="DodgerBlue" Content="Load" Click="Load_Clicked"/>
-                    <Button Background="DodgerBlue" Content="Save" Click="Save_Clicked"/>
+                    <Button Background="DodgerBlue" Foreground="White" Content="Load" Click="Load_Clicked"/>
+                    <Button Background="DodgerBlue" Foreground="White" Content="Save" Click="Save_Clicked"/>
                 </ToolBar>
             </ToolBarTray>
-            <!-- Listbox -->
+            
+            <!-- Listbox | This is our game board. Includes click handlers. -->
             <ListBox x:Name="MainList" 
                      VerticalAlignment="Top" 
                      Height="400" Width="Auto" 
@@ -36,7 +37,7 @@
                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
                      MouseLeftButtonUp="MainList_LeftClick"
                      MouseRightButtonUp="MainList_RightClick">
-
+                <!-- Board style. -->
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="{x:Type ListBoxItem}">
                         <Setter Property="BorderThickness" Value="1" />
@@ -58,17 +59,35 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <StackPanel x:Name="BtnStackPanel" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="121,0,121,1" Height="42">
+            
+            <!-- Control panel along the bottom of the window. -->
+            <StackPanel x:Name="BtnStackPanel" Orientation="Horizontal" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,0" Height="60">
+                <StackPanel x:Name="SeedStack" Orientation="Vertical" Margin="0,0,5,0" VerticalAlignment="Top" Width="70">
+                    <Label Content="Seed:"/>
+                    <TextBox x:Name="SeedTextBox" KeyDown="SeedTextBox_KeyDown"/>
+                </StackPanel>
+                <StackPanel x:Name="RowsStack" Orientation="Vertical" Margin="0,0,0,0" VerticalAlignment="Top" Width="70">
+                    <Label Content="Rows:"/>
+                    <TextBox x:Name="RowTextBox" KeyDown="RowTextBox_KeyDown"/>
+                </StackPanel>
+                <StackPanel x:Name="ColsStack" Orientation="Vertical" Margin="0,0,0,0" VerticalAlignment="Top" Width="70">
+                    <Label Content="Columns:"/>
+                    <TextBox x:Name="ColTextBox" KeyDown="ColTextBox_KeyDown" />
+                </StackPanel>
                 <Button x:Name="StepBtn" Content="Step" Click="StepBtn_Click"/>
-                
-                <Button x:Name="RunBtn" Content="Run" Click="RunBtn_Click"/>
                 <Slider x:Name="SpeedSlider"
-                        Minimum="500"
-                        Maximum="10000"
+                        Minimum="1000"
+                        Maximum="3000"
                         Height="20"
                         Width="100"
                         ValueChanged="SpeedSlider_Changed" RenderTransformOrigin="0.405,3.624"/>
                 <Label x:Name="SliderVal" Content="1000 ms" VerticalAlignment="Center"/>
+                <Button x:Name="RunBtn" Content="Run" Click="RunBtn_Click"/>
+                <Button x:Name="RandomBtn" Content="Randomize" />
+                <StackPanel x:Name="ChanceStack" Orientation="Vertical" Margin="0,0,0,0" VerticalAlignment="Top" Width="70">
+                    <Label Content="% Chance:"/>
+                    <TextBox x:Name="ChanceTextBox" Text="50" KeyUp="ChanceTextBox_KeyUp"/>
+                </StackPanel>
             </StackPanel>
         </StackPanel>
     </Grid>
