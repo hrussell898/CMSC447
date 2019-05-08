@@ -112,7 +112,7 @@ namespace ConwayGameOfLife
                 ListBoxItem tile = new ListBoxItem();
                 MainList.Items.Insert(0, tile);
             }
-
+            
             // Display current board size.
             RowTextBox.Text = m_boardRows.ToString();
             ColTextBox.Text = m_boardCols.ToString();
@@ -175,11 +175,12 @@ namespace ConwayGameOfLife
 
         private void RandomizeBoard(object sender, RoutedEventArgs e)
         {
-            int rand = m_rng.Next(1, 100);
+            int rand;
             for (int x = 0; x < m_boardRows; x++)
             {
                 for (int y = 0; y < m_boardCols; y++)
                 {
+                    rand = m_rng.Next(1, 100);
                     if (rand <= (m_randChance / 10))
                     {
                         m_board[x][y] = Constants.Virus;
@@ -191,9 +192,7 @@ namespace ConwayGameOfLife
                     else
                     {
                         m_board[x][y] = Constants.Dead;
-                    }
-                    
-                    rand = m_rng.Next(100);
+                    }  
                 }
             }
             DrawBoard();
@@ -238,8 +237,9 @@ namespace ConwayGameOfLife
         // Right-click handler. Places "Virus" cells on the board.
         private void MainList_RightClick(object sender, MouseEventArgs e)
         {
-
             int index = MainList.SelectedIndex;
+            if (index < 0)
+                return;
             ListBoxItem newItem = new ListBoxItem();
             Point myPoint = getPoint(index);
             if (m_board[myPoint.X][myPoint.Y] == Constants.Virus)
@@ -764,6 +764,29 @@ namespace ConwayGameOfLife
                 return;
             ChanceTextBox.Text = newChance.ToString();
             m_randChance = newChance;
+        }
+
+        private void MainList_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                int index = MainList.SelectedIndex;
+                if (index < 0)
+                    return;
+                ListBoxItem newItem = new ListBoxItem();
+                Point myPoint = getPoint(index);
+                if (m_board[myPoint.X][myPoint.Y] == Constants.Alive)
+                {
+                    newItem.Background = Constants.DeadColor;
+                    m_board[myPoint.X][myPoint.Y] = Constants.Dead;
+                }
+                else
+                {
+                    newItem.Background = Constants.AliveColor;
+                    m_board[myPoint.X][myPoint.Y] = Constants.Alive;
+                }
+                MainList.Items[index] = newItem;
+            }
         }
     } // Class
 } // Namespace
