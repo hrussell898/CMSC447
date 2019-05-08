@@ -36,7 +36,8 @@
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" 
                      ScrollViewer.VerticalScrollBarVisibility="Disabled"
                      MouseLeftButtonUp="MainList_LeftClick"
-                     MouseRightButtonUp="MainList_RightClick">
+                     MouseRightButtonUp="MainList_RightClick"
+                     MouseMove="MainList_MouseMove">
                 <!-- Board style. -->
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="{x:Type ListBoxItem}">
