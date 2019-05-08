@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -19,8 +20,6 @@ using System.Windows.Shapes;
 using Microsoft.Win32;
 
 
-
-
 namespace ConwayGameOfLife
 {
     static class Constants
@@ -29,12 +28,19 @@ namespace ConwayGameOfLife
         public const int BoardWidth = 80;
         public const int TileSize = 10;
 
+        public const int MinRows = 10;
+        public const int MaxRows = 60;
+        public const int MinCols = 10;
+        public const int MaxCols = 140;
+
         public const byte Dead = 0;
         public const byte Alive = 1;
         public const byte Virus = 2;
 
-        public const string AliveImage = "Resources/Bacteria.jpg";
-        public const string VirusImage = "Resources/Virus.jpg";
+
+        public static Brush DeadColor = Brushes.White;
+        public static Brush AliveColor = Brushes.Black;
+        public static Brush VirusColor = Brushes.LightGreen;
     }
 
     /// Interaction logic for MainWindow.xaml
@@ -55,24 +61,32 @@ namespace ConwayGameOfLife
             public int Y { get => y; set => y = value; }
         }
 
-        //
+        ////////////////////////
         // Data Members
         //
+
+        // This is our data structure for the backend of the board. It reflects the state of the ListBoxItems on the board.
         private List<List<byte> > m_board = new List<List<byte>>();
         private int m_boardRows = Constants.BoardHeight;
         private int m_boardCols = Constants.BoardWidth;
 
         private bool m_running = true;
         private bool m_step = false;
+        private bool m_resizing = false;
 
+        // For randomizing the board.
+        private static Random m_rng = new Random();
+        private static int m_randChance = 50;
+
+        // This timer will be set to m_speed interval whenever the run button is toggled on.
+        // After each interval the Step() function is called.
         private System.Timers.Timer m_timer = new System.Timers.Timer();
         private int m_speed = 1000; // In milliseconds.
-        
-        
 
+        // Separate thread to perform Step() in 
         private Thread boardThread;
-
-
+        
+        // Window component constructor.
         public MainWindow()
         {
             InitializeComponent();
@@ -85,7 +99,8 @@ namespace ConwayGameOfLife
 
             // Initialize the board data structure.
             BoardInit( m_board, Constants.BoardHeight, Constants.BoardWidth );
-            
+            m_board.Capacity = Constants.MaxRows;
+
             // Resize main list for board width/height.
             MainList.Height = Constants.BoardHeight * Constants.TileSize + 4;
             MainList.MaxWidth = Constants.BoardWidth * Constants.TileSize + 4;
@@ -97,7 +112,11 @@ namespace ConwayGameOfLife
                 ListBoxItem tile = new ListBoxItem();
                 MainList.Items.Insert(0, tile);
             }
-            
+
+            // Display current board size.
+            RowTextBox.Text = m_boardRows.ToString();
+            ColTextBox.Text = m_boardCols.ToString();
+
             // Timer for when the auto-run is selected.
             m_timer.Elapsed += RunEvent;
             m_timer.Enabled = false;
@@ -105,18 +124,19 @@ namespace ConwayGameOfLife
             m_timer.Interval = m_speed;
 
             SpeedSlider.Value = m_speed;
-            
+
+            RandomBtn.Click += new RoutedEventHandler(RandomizeBoard);
 
             // Start our worker thread.
             boardThread = new Thread(Run);
-            boardThread.SetApartmentState(ApartmentState.STA);
+            boardThread.SetApartmentState(ApartmentState.STA); // This allows the thread to access data members.
             boardThread.Start();
         }
 
         // Handler for the m_timer event.
         private void RunEvent(Object source, System.Timers.ElapsedEventArgs e)
         {
-            Step();
+            m_step = true;
         }
 
         // Terminated thread when closing application.
@@ -147,8 +167,39 @@ namespace ConwayGameOfLife
         private void RunBtn_Click(object sender, RoutedEventArgs e)
         {
             m_timer.Enabled = !m_timer.Enabled;
+            if (m_timer.Enabled)
+                RunBtn.Content = "Pause";
+            else
+                RunBtn.Content = "Run";
         }
 
+        private void RandomizeBoard(object sender, RoutedEventArgs e)
+        {
+            int rand = m_rng.Next(1, 100);
+            for (int x = 0; x < m_boardRows; x++)
+            {
+                for (int y = 0; y < m_boardCols; y++)
+                {
+                    if (rand <= (m_randChance / 10))
+                    {
+                        m_board[x][y] = Constants.Virus;
+                    }
+                    else if (rand <= m_randChance)
+                    {
+                        m_board[x][y] = Constants.Alive; 
+                    }
+                    else
+                    {
+                        m_board[x][y] = Constants.Dead;
+                    }
+                    
+                    rand = m_rng.Next(100);
+                }
+            }
+            DrawBoard();
+        }
+
+        // This runs in a separate thread and only calls Step() when the Step button is clicked.
         private void Run()
         {
             while (m_running)
@@ -158,10 +209,11 @@ namespace ConwayGameOfLife
                     Step();
                     m_step = false;
                 }
+                System.Threading.Thread.Sleep(1);
             }       
         }
 
-        // Left-click handler.
+        // Left-click handler. Places "Living" cells on the board.
         private void MainList_LeftClick(object sender, MouseEventArgs e)
         {
             
@@ -172,18 +224,18 @@ namespace ConwayGameOfLife
             Point myPoint = getPoint(index);
             if (m_board[myPoint.X][myPoint.Y] == Constants.Alive)
             {
-                newItem.Background = Brushes.White;
+                newItem.Background = Constants.DeadColor;
                 m_board[myPoint.X][myPoint.Y] = Constants.Dead;
             }
             else
             {
-                newItem.Background = Brushes.Black;
+                newItem.Background = Constants.AliveColor;
                 m_board[myPoint.X][myPoint.Y] = Constants.Alive;
             }
             MainList.Items[index] = newItem;
         }
 
-        // Right-click handler.
+        // Right-click handler. Places "Virus" cells on the board.
         private void MainList_RightClick(object sender, MouseEventArgs e)
         {
 
@@ -192,39 +244,57 @@ namespace ConwayGameOfLife
             Point myPoint = getPoint(index);
             if (m_board[myPoint.X][myPoint.Y] == Constants.Virus)
             {
-                newItem.Background = Brushes.White;
+                newItem.Background = Constants.DeadColor;
                 m_board[myPoint.X][myPoint.Y] = Constants.Dead;
             }
             else
             {
-                newItem.Background = Brushes.Green;
+                newItem.Background = Constants.VirusColor;
                 m_board[myPoint.X][myPoint.Y] = Constants.Virus;
             }
             MainList.Items[index] = newItem;
         }
 
-        // Will populate the board with dead tiles with the given dimensions.
-        private void BoardInit( List<List<byte>> board, int rows, int cols)
+        // Will populate the board with dead tiles with the given dimensions. Returns 0 on success.
+        private int BoardInit( List<List<byte>> board, int rows, int cols)
         {
             if (board == null)
             {
                 throw new ArgumentNullException(nameof(board));
             }
-
-            board.Capacity = rows;
-            for(int row = 0 ; row < rows; ++row )
+            
+            if( rows < Constants.MinRows || rows > Constants.MaxRows || cols < Constants.MinCols || cols > Constants.MaxCols )
             {
+                return -1;
+            }
+            board.Clear();
+            for (int row = 0 ; row < rows; ++row )
+            {
+                
                 board.Add( new List<byte>(cols) );
                 for( int col = 0; col < cols; ++col )
                 {
                     board[row].Add(Constants.Dead);
                 }
             }
+            return 0;
         }
 
         // This will "step" the board one time tick into the future.
         private void Step()
         {
+            // If the board is resizing we want to wait until it is done.
+            if (m_resizing)
+                return;
+
+            // If we are in continuous run mode we need to stop the timer until the operation finishes and then restart it.
+            bool reenableTimer = false;
+            if(m_timer.Enabled)
+            {
+                reenableTimer = true;
+                m_timer.Enabled = false;
+            }
+
             List<List<byte>> newBoard = new List<List<byte>>();
             BoardInit(newBoard, m_boardRows, m_boardCols);
 
@@ -235,13 +305,14 @@ namespace ConwayGameOfLife
             List<Tuple<int, int>> neighbors= new List<Tuple<int, int>>();
             Random rand = new Random(); // Randomizer for virus victim choosing.
 
-            for (int i = 0; i < m_board.Capacity; ++i)
+            for (int i = 0; i < m_boardRows; ++i)
             {
-                for (int j = 0; j < m_board[0].Capacity; ++j)
+                for (int j = 0; j < m_boardCols; ++j)
                 {
                     numNeighbors = 0;
                     
                     // Check for living neighbors.
+                    // Top Left
                     if (i != 0 && j != 0)
                     {
                         if (m_board[i - 1][j - 1] == Constants.Alive)
@@ -256,6 +327,7 @@ namespace ConwayGameOfLife
 
                     }
 
+                    // Top
                     if (i != 0)
                     {
                         if (m_board[i - 1][j] == Constants.Alive)
@@ -269,6 +341,7 @@ namespace ConwayGameOfLife
                         }
                     }
 
+                    // Top Right
                     if (i != 0 && j != m_board[0].Count - 1)
                     {
                         if (m_board[i - 1][j + 1] == Constants.Alive)
@@ -282,6 +355,7 @@ namespace ConwayGameOfLife
                         }
                     }
 
+                    // Left
                     if (j != 0)
                     {
                         if (m_board[i][j - 1] == Constants.Alive)
@@ -295,6 +369,7 @@ namespace ConwayGameOfLife
                         }
                     }
 
+                    // Right
                     if (j != m_board[0].Count - 1)
                     {
                         if (m_board[i][j + 1] == Constants.Alive)
@@ -308,6 +383,7 @@ namespace ConwayGameOfLife
                         }
                     }
 
+                    // Bottom Left
                     if (i != m_board.Count - 1 && j != 0)
                     {
                         if (m_board[i + 1][j - 1] == Constants.Alive)
@@ -321,7 +397,7 @@ namespace ConwayGameOfLife
                         }
                     }
 
-
+                    // Bottom
                     if (i != m_board.Count - 1 && j != 0)
                     {
                         if (m_board[i + 1][j] == Constants.Alive)
@@ -335,6 +411,7 @@ namespace ConwayGameOfLife
                         }
                     }
 
+                    // Bottom Right
                     if (i != m_board.Count - 1 && j != m_board[0].Count - 1)
                     {
                         if (m_board[i + 1][j + 1] == Constants.Alive)
@@ -401,9 +478,13 @@ namespace ConwayGameOfLife
             // Update the board. 
             m_board = newBoard;
             Application.Current.Dispatcher.Invoke(DrawBoard);
+
+            // If we stopped the timer we need to restart it.
+            if( reenableTimer )
+                m_timer.Enabled = true;
         }
 
-        // Redraws board.
+        // Redraw board.
         private void DrawBoard()
         {
             // Update listboxes based on m_board.
@@ -415,12 +496,12 @@ namespace ConwayGameOfLife
                     ListBoxItem newItem = new ListBoxItem();
                     if( m_board[row][col] == Constants.Virus )
                     {
-                        newItem.Background = Brushes.Green;
+                        newItem.Background = Constants.VirusColor;
                         MainList.Items[index] = newItem;
                     } 
                     else if( m_board[row][col] == Constants.Alive )
                     {
-                        newItem.Background = Brushes.Black;
+                        newItem.Background = Constants.AliveColor;
                         MainList.Items[index] = newItem;
                     }
                     else
@@ -449,10 +530,11 @@ namespace ConwayGameOfLife
             return retVal;
         }
 
-        // File functions.
+        // Will prompt user to save the current board configuration to a file.
         private void Save_Clicked(object sender, RoutedEventArgs e)
         {
             SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.DefaultExt = "gol";
             if (saveFileDialog.ShowDialog() == true)
             {
                 Console.WriteLine(saveFileDialog.FileName);
@@ -471,6 +553,7 @@ namespace ConwayGameOfLife
             }
         }
 
+        // Will prompt user to select a previously saved board configuration from a file. Handles load errors and malformed formats.
         private void Load_Clicked(object sender, RoutedEventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
@@ -478,20 +561,209 @@ namespace ConwayGameOfLife
             {
                 using (BinaryReader reader = new BinaryReader(File.Open(openFileDialog.FileName, FileMode.Open)))
                 {
-                    m_boardRows = reader.ReadInt32();
-                    m_boardCols = reader.ReadInt32();
-                    m_board = new List<List<byte>>();
-                    BoardInit(m_board, m_boardRows, m_boardCols);
-                    for (int i = 0; i < m_boardRows; ++i)
+                    List<List<byte>> tempBoard;
+                    int tempRows;
+                    int tempCols;
+
+                    // We are doing a try in case the file is smaller than expected.
+                    try
                     {
-                        for (int j = 0; j < m_boardCols; ++j)
+                        tempRows = reader.ReadInt32();
+                        tempCols = reader.ReadInt32();
+                        tempBoard = new List<List<byte>>();
+
+                        // We will attempt to initialize the board with the read in values. BoardInit will return non-zero on error.
+                        int retval = BoardInit(tempBoard, tempRows, tempCols);
+                        if( retval != 0 )
                         {
-                            m_board[i][j] = reader.ReadByte();
+                            MessageBox.Show("File load error: Corrupt or malformed file.", "File Load Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+                        for (int i = 0; i < tempRows; ++i)
+                        {
+                            for (int j = 0; j < tempCols; ++j)
+                            {
+                                tempBoard[i][j] = reader.ReadByte();
+
+                                // Sanity check of read Byte. If it's not a valid value set it to a "dead" cell.
+                                if(tempBoard[i][j] < Constants.Dead || tempBoard[i][j] > Constants.Virus)
+                                {
+                                    tempBoard[i][j] = Constants.Dead;
+                                }
+                            }
                         }
                     }
+                    catch(EndOfStreamException eos)
+                    {
+                        MessageBox.Show("File load error: Corrupt or malformed file.", "File Load Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    m_board = tempBoard;
+                    m_boardRows = tempRows;
+                    m_boardCols = tempCols;
                 }
+
+                // Fill board.
+                MainList.Items.Clear();
+                int numberOfTiles = m_boardRows * m_boardCols;
+                for (int i = 0; i < numberOfTiles; ++i)
+                {
+                    ListBoxItem tile = new ListBoxItem();
+                    MainList.Items.Insert(0, tile);
+                }
+
+                // Update GUI board size.
+                RowTextBox.Text = m_boardRows.ToString();
+                ColTextBox.Text = m_boardCols.ToString();
+
+                // Resize main list for new board width/height.
+                MainList.Height = m_boardRows * Constants.TileSize + 4;
+                MainList.MaxWidth = m_boardCols * Constants.TileSize + 4;
                 DrawBoard();
             }
+        }
+
+        // Handler for change the number of rows.
+        private void RowTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            // We will apply changes only once enter is pressed.
+            if (e.Key != Key.Enter)
+                return;
+
+            // If we are running we want to stop before continuing with a resize.
+            if (m_timer.Enabled)
+            {
+                m_timer.Enabled = false;
+                RunBtn.Content = "Run";
+            }
+
+            // Parse input and sanity check.
+            string newRowString = Regex.Match(RowTextBox.Text, @"\d+").Value;
+            if (newRowString == "")
+                return;
+            int newRow = Int32.Parse(newRowString);
+            if (newRow == m_boardRows)
+                return;
+
+            // Check that the input is within range. If so, resize.
+            if (newRow >= Constants.MinRows && newRow <= Constants.MaxRows)
+            {
+                m_resizing = true;
+                m_boardRows = newRow;
+                RowTextBox.Text = m_boardRows.ToString();
+                BoardInit(m_board, m_boardRows, m_boardCols);
+
+                // Fill board.
+                MainList.Items.Clear();
+                int numberOfTiles = m_boardRows * m_boardCols;
+                for (int i = 0; i < numberOfTiles; ++i)
+                {
+                    ListBoxItem tile = new ListBoxItem();
+                    MainList.Items.Insert(0, tile);
+                }
+
+                // Resize main list for new board height.
+                MainList.Height = m_boardRows * Constants.TileSize + 4;
+
+                DrawBoard();
+            }
+            else
+            {
+                MessageBox.Show(String.Format("Row value {0} outside of range: {1} - {2}.", newRow, Constants.MinRows, Constants.MaxRows), "Board Dimensions Outside of Range", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            m_resizing = false;
+        }
+
+        // Handler for change the number of rows.
+        private void ColTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            // We will apply changes only once enter is pressed.
+            if (e.Key != Key.Enter)
+                return;
+
+            // If we are running we want to stop before continuing with a resize.
+            if (m_timer.Enabled)
+            {
+                m_timer.Enabled = false;
+                RunBtn.Content = "Run";
+            }
+
+            string newColString = Regex.Match(ColTextBox.Text, @"\d+").Value;
+            if (newColString == "")
+                return;
+            int newCol = Int32.Parse(newColString);
+            if (newCol == m_boardCols)
+                return;
+            if (newCol >= Constants.MinCols && newCol <= Constants.MaxCols)
+            {
+                m_resizing = true;
+                m_boardCols = newCol;
+                ColTextBox.Text = m_boardCols.ToString();
+                BoardInit(m_board, m_boardRows, m_boardCols);
+
+                // Fill board.
+                MainList.Items.Clear();
+                int numberOfTiles = m_boardRows * m_boardCols;
+                for (int i = 0; i < numberOfTiles; ++i)
+                {
+                    ListBoxItem tile = new ListBoxItem();
+                    MainList.Items.Insert(0, tile);
+                }
+
+                // Resize main list for new board width.
+                MainList.MaxWidth = m_boardCols * Constants.TileSize + 4;
+
+                DrawBoard();
+            }
+            else
+            {
+                MessageBox.Show(String.Format("Column value {0} outside of range: {1} - {2}.", newCol, Constants.MinCols, Constants.MaxCols), "Board Dimensions Outside of Range", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            m_resizing = false;
+        }
+
+        // This will randomly populate our board.
+        private void SeedTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            // We will apply changes only once enter is pressed.
+            if (e.Key != Key.Enter)
+                return;
+
+            // We need an integer value to work with.
+            string seedString = Regex.Match(SeedTextBox.Text, @"\d+").Value;
+            if (seedString == "")
+                return;
+            int seed = Int32.Parse(seedString);
+            SeedTextBox.Text = "";
+
+            // Use our seed for the random number generator.
+            Random rand = new Random(seed);
+
+            // Fill the board randomly.
+            for (int row = 0; row < m_boardRows; ++row)
+            {
+                for (int col = 0; col < m_boardCols; ++col)
+                {
+                    m_board[row][col] = (byte)rand.Next(Constants.Dead, Constants.Virus + 1);
+                }
+            }
+
+            // Redraw the board.
+            DrawBoard();
+        }
+
+        // Handler for change the number of rows.
+        private void ChanceTextBox_KeyUp(object sender, KeyEventArgs e)
+        {
+            // Parse input and sanity check.
+            string newChanceString = Regex.Match(ChanceTextBox.Text, @"\d+").Value;
+            if (newChanceString == "")
+                return;
+            int newChance = Int32.Parse(newChanceString);
+            if (newChance > 100 || newChance < 0)
+                return;
+            ChanceTextBox.Text = newChance.ToString();
+            m_randChance = newChance;
         }
     } // Class
 } // Namespace
